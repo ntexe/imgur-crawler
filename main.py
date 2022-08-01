@@ -7,7 +7,7 @@ import os
 default_links_per_call = 24 # link per call default
 
 class App():
-    def __init__(self, links_per_call = 24):
+    def __init__(self, links_per_call=24):
         with open("image_not_found.png", "rb") as file:
             self.image_not_found_bytes = file.read()
 
@@ -26,7 +26,7 @@ class App():
         if not os.path.exists(path):
             os.makedirs(path)
 
-    def validate_response(self, response):
+    def validate_response(self, response) -> bool:
         # return False if response is None
         if response == None:
             return False
@@ -39,7 +39,7 @@ class App():
         # return False if response isn't image/video
         if "content-type" in response.headers:
             # if content-type problem will be fixed
-            if "image" not in response.headers["content-type"] \
+            if  "image" not in response.headers["content-type"] \
             and "video" not in response.headers["content-type"]:
                 return False
         else:
@@ -47,18 +47,19 @@ class App():
 
         # return False if file is "requested image not exits" or empty
         if response.content == self.image_not_found_bytes \
-            or response.content == b"":
+        or response.content == b"":
             return False
 
         return True
 
-    def generate_name_with_extension(self, extension):
+    def generate_name_with_extension(self, extension) -> str:
         return ''.join(
-            choices(self.strs, k = randint(*self.range_of_lenghts_of_name))
+            choices(self.strs, k=randint(*self.range_of_lenghts_of_name))
             ) + extension
 
     def generate_link_list(self):
-        link_list = [
+        link_list = \
+        [
         self.link_template.format(self.generate_name_with_extension(ext))
         for ext in self.ext_to_check
         for _ in range(self.links_per_call // len(self.ext_to_check))
@@ -66,7 +67,7 @@ class App():
 
         return link_list
 
-    def generate_path(self, url):
+    def generate_path(self, url) -> str:
         return f"{self.path_to_folder}/{url.split('/')[-1].split('?')[0]}"
 
     def main(self):
