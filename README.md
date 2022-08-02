@@ -10,8 +10,6 @@ Crawls pictures and videos from [imgur.com](https://imgur.com) at full resolutio
 * Ids of images/videos saving to db, so downloaded images will not be downloaded again.
 * You can dump db using Python script "make_dump_of_db.py"
 * App logs saving to main.log
-* Ids of images/videos saving to database, so downloaded images will not be downloaded again.
-* You can dump database using Python script "make_dump_of_db.py"
 
 ## Installation
 ### Linux
