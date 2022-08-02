@@ -1,9 +1,8 @@
-print("Importing modules...")
-
 from string import ascii_letters, digits
 from random import randint, choices
 from sys import argv
 from sqlite3 import connect
+import logging
 import os
 
 import grequests
@@ -12,8 +11,19 @@ import settings
 
 default_links_per_call = 24 # link per call default
 
+# logging setup
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s: %(name)s - %(message)s",
+    handlers=[
+        logging.FileHandler("main.log"),
+        logging.StreamHandler()
+    ])
+
 class App():
     def __init__(self, links_per_call=24):
+        logging.info("Initializing class App")
         with open(settings.name_of_image_not_found, "rb") as file:
             self.image_not_found_bytes = file.read()
         self.links_per_call = links_per_call
@@ -27,6 +37,7 @@ class App():
         self.ext_to_check = (".png", ".mp4") # order is IMPORTANT
 
     def init_db(self):
+        logging.info("Initializing database")
         connection = connect(settings.db_name)
         cursor = connection.cursor()
 
@@ -49,6 +60,7 @@ class App():
         if response == None:
             return False
 
+        raise
         """
         videos and photos has "content-type" header, which is "video/mp4" or
         "image/png" or other, but html pages isn't have "content-type" header
@@ -95,19 +107,20 @@ class App():
         return f"{settings.path_to_folder}/{self.parse_id_with_ext(url)}"
 
     def main(self):
-        print("Initializing...")
         self.create_folder_if_not_exits(settings.path_to_folder)
 
         connection, cursor = self.init_db()
 
         previous_link_bytes = None
 
-        print("Starting crawling...")
+        logging.info("Starting Crawling")
 
         while 1:
+            logging.info(f"Generating {self.links_per_call} links")
             # generating link list
             link_list = self.generate_link_list()
 
+            logging.info(f"Sending {self.links_per_call} requests")
             # charging and sending requests
             responses = grequests.map((grequests.get(u) for u in link_list))
 
@@ -133,11 +146,13 @@ class App():
                                   (?, CURRENT_TIMESTAMP)""",
                                (self.parse_id(response.url),))
 
+                logging.info(
+                f"Saving {response.url} to {self.generate_path(response.url)}"
+                )
+
                 # saving
                 with open(self.generate_path(response.url), 'wb') as out_file:
                     out_file.write(response.content)
-
-                print(f"Downloaded >> {response.url}")
             connection.commit()
 
 def parse_arg():

@@ -7,6 +7,9 @@ Crawls pictures and videos from [imgur.com](https://imgur.com) at full resolutio
 * Getting maximum resolution of image/video
 * Asynchronous requests using [grequests](https://pypi.org/project/grequests/)
 * Readable code, so you can fork it and modify for yourself
+* Ids of images/videos saving to db, so downloaded images will not be downloaded again.
+* You can dump db using Python script "make_dump_of_db.py"
+* App logs saving to main.log
 * Ids of images/videos saving to database, so downloaded images will not be downloaded again.
 * You can dump database using Python script "make_dump_of_db.py"
 
