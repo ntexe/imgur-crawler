@@ -1,18 +1,22 @@
-import grequests
+print("Importing modules...")
+
 from string import ascii_letters, digits
 from random import randint, choices
 from sys import argv
+from sqlite3 import connect
 import os
+
+import grequests
+
+import settings
 
 default_links_per_call = 24 # link per call default
 
 class App():
     def __init__(self, links_per_call=24):
-        with open("image_not_found.png", "rb") as file:
+        with open(settings.name_of_image_not_found, "rb") as file:
             self.image_not_found_bytes = file.read()
-
         self.links_per_call = links_per_call
-        self.path_to_folder = "Images"
 
         #### Constants for link generator ####
 
@@ -21,6 +25,20 @@ class App():
         self.strs = ascii_letters + digits
         self.range_of_lenghts_of_name = (5, 7)
         self.ext_to_check = (".png", ".mp4") # order is IMPORTANT
+
+    def init_db(self):
+        connection = connect(settings.db_name)
+        cursor = connection.cursor()
+
+        cursor.execute("""CREATE TABLE IF NOT EXISTS downloaded_files_ids
+            (id TEXT,
+            moment TEXT)
+            """)
+
+        connection.commit()
+
+        return connection, cursor
+
 
     def create_folder_if_not_exits(self, path):
         if not os.path.exists(path):
@@ -67,13 +85,24 @@ class App():
 
         return link_list
 
+    def parse_id_with_ext(self, url) -> str:
+        return url.split('/')[-1].split('?')[0]
+
+    def parse_id(self, url) -> str:
+        return self.parse_id_with_ext(url).split(".")[0]
+
     def generate_path(self, url) -> str:
-        return f"{self.path_to_folder}/{url.split('/')[-1].split('?')[0]}"
+        return f"{settings.path_to_folder}/{self.parse_id_with_ext(url)}"
 
     def main(self):
-        self.create_folder_if_not_exits(self.path_to_folder)
+        print("Initializing...")
+        self.create_folder_if_not_exits(settings.path_to_folder)
+
+        connection, cursor = self.init_db()
 
         previous_link_bytes = None
+
+        print("Starting crawling...")
 
         while 1:
             # generating link list
@@ -87,16 +116,29 @@ class App():
                 if not self.validate_response(response):
                     continue
 
-                # continue if photo/video already downloaded
+                # continue if previous link file has the same content
                 if response.content == previous_link_bytes:
                     continue
                 previous_link_bytes = response.content
+
+                # continue if id is already in DB
+                cursor.execute("""SELECT id
+                                  FROM downloaded_files_ids
+                                  WHERE id=?""",
+                               (self.parse_id(response.url),))
+                if cursor.fetchall(): # if list is not empty
+                    continue
+
+                cursor.execute("""INSERT INTO downloaded_files_ids VALUES
+                                  (?, CURRENT_TIMESTAMP)""",
+                               (self.parse_id(response.url),))
 
                 # saving
                 with open(self.generate_path(response.url), 'wb') as out_file:
                     out_file.write(response.content)
 
                 print(f"Downloaded >> {response.url}")
+            connection.commit()
 
 def parse_arg():
     if len(argv) > 1:
