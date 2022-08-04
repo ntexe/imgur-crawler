@@ -59,8 +59,7 @@ class App():
         # return False if response is None
         if response == None:
             return False
-
-        raise
+            
         """
         videos and photos has "content-type" header, which is "video/mp4" or
         "image/png" or other, but html pages isn't have "content-type" header
