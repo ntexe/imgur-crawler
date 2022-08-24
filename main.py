@@ -1,9 +1,9 @@
-from string import ascii_letters, digits
-from random import randint, choices
-from sys import argv
-from sqlite3 import connect
 import logging
 import os
+from random import choices, randint
+from sqlite3 import connect
+from string import ascii_letters, digits
+from sys import argv
 
 import grequests
 
@@ -28,7 +28,7 @@ class App():
             self.image_not_found_bytes = file.read()
         self.links_per_call = links_per_call
 
-        #### Constants for link generator ####
+        # Constants for link generator
 
         # maxwidth parameter to get full resolution pic
         self.link_template = "https://i.imgur.com/{}?maxwidth=4320"
@@ -42,41 +42,41 @@ class App():
         cursor = connection.cursor()
 
         cursor.execute("""CREATE TABLE IF NOT EXISTS downloaded_files_ids
-            (id TEXT,
-            moment TEXT)
-            """)
+            (id TEXT, moment TEXT)""")
 
         connection.commit()
 
         return connection, cursor
 
-
     def create_folder_if_not_exits(self, path):
         if not os.path.exists(path):
             os.makedirs(path)
+
+    def check_response_headers(self, response_headers) -> bool:
+        """
+        videos and photos has "content-type" header, which is "video/mp4",
+        "image/png" or other, but html pages don't have "content-type" header
+        """
+
+        # return False if response isn't image/video
+        if "content-type" in response_headers:
+            content_type = response_headers["content-type"]
+            return "image" in content_type or "video" in content_type
+        return False
+
+    def check_file_content(self, response_content) -> bool:
+        # return False if file is "requested image not exits" or empty
+        return response_content not in (self.image_not_found_bytes, b"")
 
     def validate_response(self, response) -> bool:
         # return False if response is None
         if response == None:
             return False
-            
-        """
-        videos and photos has "content-type" header, which is "video/mp4" or
-        "image/png" or other, but html pages isn't have "content-type" header
-        """
 
-        # return False if response isn't image/video
-        if "content-type" in response.headers:
-            # if content-type problem will be fixed
-            if  "image" not in response.headers["content-type"] \
-            and "video" not in response.headers["content-type"]:
-                return False
-        else:
+        if not self.check_response_headers():
             return False
 
-        # return False if file is "requested image not exits" or empty
-        if response.content == self.image_not_found_bytes \
-        or response.content == b"":
+        if not self.check_file_content(response.content):
             return False
 
         return True
@@ -104,66 +104,65 @@ class App():
 
     def generate_path(self, url) -> str:
         return f"{settings.path_to_folder}/{self.parse_id_with_ext(url)}"
+    
+    def process_responses(self, responses, cursor):
+        previous_link_bytes = None
+
+        for response in responses:
+            if not self.validate_response(response):
+                continue
+
+            # continue if previous link file has the same content
+            if response.content == previous_link_bytes:
+                continue
+
+            previous_link_bytes = response.content
+
+            # continue if id is already in DB
+            cursor.execute("""SELECT id FROM downloaded_files_ids WHERE id=?
+                           """, (self.parse_id(response.url),))
+            if cursor.fetchall(): # if list is not empty
+                continue
+
+            cursor.execute("""INSERT INTO downloaded_files_ids VALUES
+                                (?, CURRENT_TIMESTAMP)""",
+                            (self.parse_id(response.url),))
+
+            logging.info(
+            f"Saving {response.url} to {self.generate_path(response.url)}")
+
+            # saving
+            with open(self.generate_path(response.url), 'wb') as out_file:
+                out_file.write(response.content)
 
     def main(self):
         self.create_folder_if_not_exits(settings.path_to_folder)
-
         connection, cursor = self.init_db()
-
-        previous_link_bytes = None
 
         logging.info("Starting Crawling")
 
         while 1:
             logging.info(f"Generating {self.links_per_call} links")
-            # generating link list
-            link_list = self.generate_link_list()
+            link_list = self.generate_link_list() # generating link list
 
             logging.info(f"Sending {self.links_per_call} requests")
-            # charging and sending requests
             responses = grequests.map((grequests.get(u) for u in link_list))
 
-            # checking and saving
-            for response in responses:
-                if not self.validate_response(response):
-                    continue
+            self.process_responses(responses, cursor)
 
-                # continue if previous link file has the same content
-                if response.content == previous_link_bytes:
-                    continue
-                previous_link_bytes = response.content
-
-                # continue if id is already in DB
-                cursor.execute("""SELECT id
-                                  FROM downloaded_files_ids
-                                  WHERE id=?""",
-                               (self.parse_id(response.url),))
-                if cursor.fetchall(): # if list is not empty
-                    continue
-
-                cursor.execute("""INSERT INTO downloaded_files_ids VALUES
-                                  (?, CURRENT_TIMESTAMP)""",
-                               (self.parse_id(response.url),))
-
-                logging.info(
-                f"Saving {response.url} to {self.generate_path(response.url)}"
-                )
-
-                # saving
-                with open(self.generate_path(response.url), 'wb') as out_file:
-                    out_file.write(response.content)
             connection.commit()
 
-def parse_arg():
-    if len(argv) > 1:
-        try:
-            int(argv[1])
-        except:
-            return default_links_per_call
-        return int(argv[1])
-    return default_links_per_call
+if __name__ == "__main__":
+    def parse_arg():
+        if len(argv) > 1:
+            try:
+                int(argv[1])
+            except:
+                return default_links_per_call
+            return int(argv[1])
+        return default_links_per_call
 
-# _ to avoid variable bugs
-_links_per_call = parse_arg()
+    # _ to avoid variable bugs
+    _links_per_call = parse_arg()
 
-App(_links_per_call).main()
+    App(_links_per_call).main()
