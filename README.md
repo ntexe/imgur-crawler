@@ -69,3 +69,7 @@ python main.py [links per function call]
 Tested on
 * Windows 10 21H2 Python 3.10.2
 * Termux Python 3.10.4
+
+
+TODO:
+* Unit Tests

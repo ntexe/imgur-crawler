@@ -1,13 +1,13 @@
 import logging
-import os
 from random import choices, randint
 from sqlite3 import connect
 from string import ascii_letters, digits
-from sys import argv
+import argparse
 
 import grequests
 
 import settings
+import utils
 
 default_links_per_call = 24 # link per call default
 
@@ -47,10 +47,6 @@ class App():
         connection.commit()
 
         return connection, cursor
-
-    def create_folder_if_not_exits(self, path):
-        if not os.path.exists(path):
-            os.makedirs(path)
 
     def check_response_headers(self, response_headers) -> bool:
         """
@@ -136,7 +132,7 @@ class App():
                 out_file.write(response.content)
 
     def main(self):
-        self.create_folder_if_not_exits(settings.path_to_folder)
+        utils.create_folder_if_not_exits(settings.path_to_folder)
         connection, cursor = self.init_db()
 
         logging.info("Starting Crawling")
@@ -153,16 +149,11 @@ class App():
             connection.commit()
 
 if __name__ == "__main__":
-    def parse_arg():
-        if len(argv) > 1:
-            try:
-                int(argv[1])
-            except:
-                return default_links_per_call
-            return int(argv[1])
-        return default_links_per_call
+    parser = argparse.ArgumentParser(description="Imgur Crawler")
+    parser.add_argument("links_per_call", nargs=1, default=24, type=int,
+                        metavar='links_per_call', dest='links_per_call',
+                        help="Links per call. Default is 24")
 
-    # _ to avoid variable bugs
-    _links_per_call = parse_arg()
+    args = parser.parse_args()
 
-    App(_links_per_call).main()
+    App(args.links_per_call).main()
