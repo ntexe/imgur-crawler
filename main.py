@@ -69,7 +69,7 @@ class App():
         if response == None:
             return False
 
-        if not self.check_response_headers():
+        if not self.check_response_headers(response.headers):
             return False
 
         if not self.check_file_content(response.content):
