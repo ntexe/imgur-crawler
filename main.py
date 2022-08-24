@@ -151,7 +151,7 @@ class App():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Imgur Crawler")
     parser.add_argument("links_per_call", nargs=1, default=24, type=int,
-                        metavar='links_per_call', dest='links_per_call',
+                        metavar='links_per_call',
                         help="Links per call. Default is 24")
 
     args = parser.parse_args()
